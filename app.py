@@ -66,7 +66,9 @@ if upload_trigger and uploaded_zip and uploaded_csv and uploaded_controls and up
         controls_df.columns = controls_df.columns.str.strip()
         controls_df = controls_df.dropna(subset=["ID", "Test name"])
         controls_df["ID"] = controls_df["ID"].astype(str).str.strip()
+        controls_df["Test name"] = controls_df["Test name"].astype(str).str.strip()
         index_df["Control Folder"] = index_df["Control Folder"].astype(str).str.strip()
+
         mapped_df = index_df.merge(
             controls_df,
             how="left",
@@ -74,7 +76,7 @@ if upload_trigger and uploaded_zip and uploaded_csv and uploaded_controls and up
             right_on="ID"
         )
 
-        # Load Tests sheet and match to Reference ID and Test ID
+        # Load Tests sheet and use Reference ID as test ID (e.g., T01, T78)
         if "Tests" in wb.sheetnames:
             tests_ws = wb["Tests"]
             tests_data = list(tests_ws.values)
@@ -82,9 +84,12 @@ if upload_trigger and uploaded_zip and uploaded_csv and uploaded_controls and up
             tests_rows = tests_data[1:]
             tests_df = pd.DataFrame(tests_rows, columns=tests_headers)
 
-            test_map_df = tests_df[["Test", "Reference ID", "test id"]].dropna()
-            test_map_df.columns = ["Test name", "Reference ID", "Test ID"]
+            tests_df["Test"] = tests_df["Test"].astype(str).str.strip()
+            tests_df["Reference ID"] = tests_df["Reference ID"].astype(str).str.strip()
+            test_map_df = tests_df[["Test", "Reference ID"]].dropna()
+            test_map_df.columns = ["Test name", "Test ID"]
 
+            test_map_df["Test name"] = test_map_df["Test name"].astype(str).str.strip()
             mapped_df = mapped_df.merge(
                 test_map_df,
                 how="left",
@@ -117,4 +122,4 @@ if upload_trigger and uploaded_zip and uploaded_csv and uploaded_controls and up
             file_name=updated_path.name,
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-        st.dataframe(mapped_df)
+        st.dataframe(mapped_df.head(50))
