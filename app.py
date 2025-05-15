@@ -2,7 +2,6 @@ import streamlit as st
 import zipfile
 import os
 import pandas as pd
-import difflib
 from pathlib import Path
 from openpyxl import load_workbook
 import tempfile
@@ -12,12 +11,12 @@ st.title("SOC 2 Audit Evidence Mapper")
 # File upload widgets
 uploaded_zip = st.file_uploader("Upload Evidence ZIP File", type="zip")
 uploaded_csv = st.file_uploader("Upload soc2-evidence CSV File", type="csv")
+uploaded_controls = st.file_uploader("Upload SOC 2 Controls Mapping CSV File", type="csv")
 uploaded_workbook = st.file_uploader("Upload Audit Workbook (.xlsx)", type="xlsx")
 
 upload_trigger = st.button("Run Evidence Mapping")
 
-if upload_trigger and uploaded_zip and uploaded_csv and uploaded_workbook:
-    # Use temporary directories for handling files
+if upload_trigger and uploaded_zip and uploaded_csv and uploaded_controls and uploaded_workbook:
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp_path = Path(tmpdir)
         evidence_folder = tmp_path / "Evidence"
@@ -25,18 +24,21 @@ if upload_trigger and uploaded_zip and uploaded_csv and uploaded_workbook:
         evidence_folder.mkdir(parents=True, exist_ok=True)
         extract_dir.mkdir(parents=True, exist_ok=True)
 
-        # Save uploaded ZIP file
+        # Save uploaded files
         zip_path = evidence_folder / uploaded_zip.name
         with open(zip_path, "wb") as f:
             f.write(uploaded_zip.read())
 
-        # Save uploaded CSV file
         csv_path = tmp_path / "soc2-evidence.csv"
         with open(csv_path, "wb") as f:
             f.write(uploaded_csv.read())
         vanta_df = pd.read_csv(str(csv_path))
 
-        # Save uploaded Excel workbook
+        controls_path = tmp_path / "controls.csv"
+        with open(controls_path, "wb") as f:
+            f.write(uploaded_controls.read())
+        controls_df = pd.read_csv(str(controls_path))
+
         wb_path = tmp_path / uploaded_workbook.name
         with open(wb_path, "wb") as f:
             f.write(uploaded_workbook.read())
@@ -46,7 +48,7 @@ if upload_trigger and uploaded_zip and uploaded_csv and uploaded_workbook:
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(extract_dir)
 
-        # Index extracted files
+        # Index evidence files
         evidence_index = []
         for root_dir, dirs, files in os.walk(extract_dir):
             for filename in files:
@@ -56,12 +58,40 @@ if upload_trigger and uploaded_zip and uploaded_csv and uploaded_workbook:
                 evidence_index.append({
                     "Filename": filename,
                     "Relative Path": relative_path,
-                    "Folder": folder
+                    "Control Folder": folder
                 })
-
         index_df = pd.DataFrame(evidence_index)
 
-        # Insert Vanta evidence CSV into all-evidence-vanta tab
+        # Clean and join controls
+        controls_df.columns = controls_df.columns.str.strip()
+        controls_df = controls_df.dropna(subset=["ID", "Test name"])
+        controls_df["ID"] = controls_df["ID"].astype(str).str.strip()
+        index_df["Control Folder"] = index_df["Control Folder"].astype(str).str.strip()
+        mapped_df = index_df.merge(
+            controls_df,
+            how="left",
+            left_on="Control Folder",
+            right_on="ID"
+        )
+
+        # Load Tests sheet and match to Reference ID and Test ID
+        if "Tests" in wb.sheetnames:
+            tests_ws = wb["Tests"]
+            tests_data = list(tests_ws.values)
+            tests_headers = tests_data[0]
+            tests_rows = tests_data[1:]
+            tests_df = pd.DataFrame(tests_rows, columns=tests_headers)
+
+            test_map_df = tests_df[["Test", "Reference ID", "test id"]].dropna()
+            test_map_df.columns = ["Test name", "Reference ID", "Test ID"]
+
+            mapped_df = mapped_df.merge(
+                test_map_df,
+                how="left",
+                on="Test name"
+            )
+
+        # Insert Vanta evidence CSV
         if "all-evidence-vanta" in wb.sheetnames:
             del wb["all-evidence-vanta"]
         all_ev_ws = wb.create_sheet("all-evidence-vanta")
@@ -69,31 +99,7 @@ if upload_trigger and uploaded_zip and uploaded_csv and uploaded_workbook:
         for row in vanta_df.itertuples(index=False):
             all_ev_ws.append(list(row))
 
-        # Load Tests tab and build mapping
-        tests_ws = wb["Tests"]
-        tests_data = list(tests_ws.values)
-        headers = tests_data[0]
-        rows = tests_data[1:]
-        tests_df = pd.DataFrame(rows, columns=headers)
-
-        base_df = tests_df[["Reference ID", "test id", "Test"]].copy()
-        base_df.columns = ["Reference ID", "Test ID", "Test Description"]
-
-        def match_folder(folder):
-            matches = difflib.get_close_matches(folder.lower(), base_df['Test Description'].str.lower(), n=1, cutoff=0.4)
-            if matches:
-                matched_row = base_df[base_df['Test Description'].str.lower() == matches[0]].iloc[0]
-                return pd.Series({
-                    'Reference ID': matched_row['Reference ID'],
-                    'Test ID': matched_row['Test ID'],
-                    'Test Description': matched_row['Test Description']
-                })
-            else:
-                return pd.Series({'Reference ID': None, 'Test ID': None, 'Test Description': None})
-
-        mapped_df = index_df.join(index_df['Folder'].apply(match_folder))
-
-        # Insert mapping into evidence-index tab
+        # Insert mapping into evidence-index
         if "evidence-index" in wb.sheetnames:
             del wb["evidence-index"]
         ev_map_ws = wb.create_sheet("evidence-index")
@@ -101,7 +107,7 @@ if upload_trigger and uploaded_zip and uploaded_csv and uploaded_workbook:
         for row in mapped_df.itertuples(index=False):
             ev_map_ws.append(list(row))
 
-        # Save workbook and provide download
+        # Save and offer for download
         updated_path = tmp_path / f"updated_{uploaded_workbook.name}"
         wb.save(updated_path)
         st.success("Workbook successfully updated!")
