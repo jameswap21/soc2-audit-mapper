@@ -5,15 +5,14 @@ import pandas as pd
 import difflib
 from pathlib import Path
 from openpyxl import load_workbook
+import tempfile
 
 st.title("SOC 2 Audit Evidence Mapper")
-
-# User input for client project folder
-project_folder = st.text_input("Enter path to client project folder (e.g. /Clients/ACME-SOC2-2025):")
 
 # File upload widgets
 uploaded_zip = st.file_uploader("Upload Evidence ZIP File", type="zip")
 uploaded_csv = st.file_uploader("Upload soc2-evidence CSV File", type="csv")
+project_folder = st.text_input("Enter path to client project folder (e.g. /Clients/ACME-SOC2-2025):")
 
 upload_trigger = st.button("Run Evidence Mapping")
 
@@ -34,10 +33,10 @@ if upload_trigger and project_folder and uploaded_zip and uploaded_csv:
         f.write(uploaded_zip.read())
 
     # Save uploaded CSV file and load into DataFrame
-    evidence_csv_path = root / "soc2-evidence.csv"
-    with open(evidence_csv_path, "wb") as f:
-        f.write(uploaded_csv.read())
-    vanta_df = pd.read_csv(str(evidence_csv_path))
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp_csv:
+        tmp_csv.write(uploaded_csv.read())
+        tmp_csv_path = tmp_csv.name
+    vanta_df = pd.read_csv(tmp_csv_path)
 
     # Extract ZIP
     with zipfile.ZipFile(zip_path, 'r') as zip_ref:
