@@ -21,10 +21,10 @@ if upload_trigger and project_folder and uploaded_zip and uploaded_csv:
     evidence_folder = root / "Evidence"
     extract_dir = evidence_folder / "_unzipped"
 
-    # Find subfolder containing the audit workbook (e.g., "TEST Customer - Reporting Deliverables")
+    # Try matching any subfolder that ends with 'Reporting Deliverables'
     deliverables_folder = None
     for subdir in root.iterdir():
-        if subdir.is_dir() and "reporting deliverables" in subdir.name.lower():
+        if subdir.is_dir() and subdir.name.lower().strip().endswith("reporting deliverables"):
             deliverables_folder = subdir
             break
 
