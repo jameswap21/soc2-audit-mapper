@@ -1,4 +1,3 @@
-
 import streamlit as st
 import zipfile
 import os
@@ -38,7 +37,7 @@ if upload_trigger and project_folder and uploaded_zip and uploaded_csv:
     evidence_csv_path = root / "soc2-evidence.csv"
     with open(evidence_csv_path, "wb") as f:
         f.write(uploaded_csv.read())
-    vanta_df = pd.read_csv(evidence_csv_path)
+    vanta_df = pd.read_csv(str(evidence_csv_path))
 
     # Extract ZIP
     with zipfile.ZipFile(zip_path, 'r') as zip_ref:
