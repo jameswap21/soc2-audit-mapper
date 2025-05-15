@@ -39,6 +39,13 @@ if upload_trigger and uploaded_zip and uploaded_csv and uploaded_controls and up
             f.write(uploaded_controls.read())
         controls_df = pd.read_csv(str(controls_path))
 
+        # Normalize and rename important columns in controls
+        controls_df.columns = controls_df.columns.str.strip()
+        controls_df = controls_df.rename(columns={
+            "Framework requirement": "Framework Requirement",
+            "Url": "URL"
+        })
+
         wb_path = tmp_path / uploaded_workbook.name
         with open(wb_path, "wb") as f:
             f.write(uploaded_workbook.read())
@@ -58,25 +65,24 @@ if upload_trigger and uploaded_zip and uploaded_csv and uploaded_controls and up
                 evidence_index.append({
                     "Filename": filename,
                     "Relative Path": relative_path,
-                    "Control Folder": folder
+                    "Vanta Control ID": folder
                 })
         index_df = pd.DataFrame(evidence_index)
 
-        # Clean and join controls
-        controls_df.columns = controls_df.columns.str.strip()
+        # Clean and join controls (many-to-many allowed)
         controls_df = controls_df.dropna(subset=["ID", "Test name"])
         controls_df["ID"] = controls_df["ID"].astype(str).str.strip()
         controls_df["Test name"] = controls_df["Test name"].astype(str).str.strip()
-        index_df["Control Folder"] = index_df["Control Folder"].astype(str).str.strip()
+        index_df["Vanta Control ID"] = index_df["Vanta Control ID"].astype(str).str.strip()
 
         mapped_df = index_df.merge(
             controls_df,
             how="left",
-            left_on="Control Folder",
-            right_on="ID"
+            left_on="Vanta Control ID",
+            right_on="Title"
         )
 
-        # Load Tests sheet and use Reference ID as test ID (e.g., T01, T78)
+        # Load Tests sheet and join for Test ID (Reference ID)
         if "Tests" in wb.sheetnames:
             tests_ws = wb["Tests"]
             tests_data = list(tests_ws.values)
@@ -96,6 +102,13 @@ if upload_trigger and uploaded_zip and uploaded_csv and uploaded_controls and up
                 on="Test name"
             )
 
+        # Reorder and select relevant columns for output
+        output_columns = [
+            "Filename", "Relative Path", "Vanta Control ID",
+            "ID", "Title", "Framework Requirement", "Test name", "Test ID", "URL"
+        ]
+        output_df = mapped_df[output_columns].copy()
+
         # Insert Vanta evidence CSV
         if "all-evidence-vanta" in wb.sheetnames:
             del wb["all-evidence-vanta"]
@@ -108,8 +121,8 @@ if upload_trigger and uploaded_zip and uploaded_csv and uploaded_controls and up
         if "evidence-index" in wb.sheetnames:
             del wb["evidence-index"]
         ev_map_ws = wb.create_sheet("evidence-index")
-        ev_map_ws.append(mapped_df.columns.tolist())
-        for row in mapped_df.itertuples(index=False):
+        ev_map_ws.append(output_df.columns.tolist())
+        for row in output_df.itertuples(index=False):
             ev_map_ws.append(list(row))
 
         # Save and offer for download
@@ -122,4 +135,4 @@ if upload_trigger and uploaded_zip and uploaded_csv and uploaded_controls and up
             file_name=updated_path.name,
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-        st.dataframe(mapped_df.head(50))
+        st.dataframe(output_df.head(50))
