@@ -118,4 +118,3 @@ if upload_trigger and uploaded_zip and uploaded_csv and uploaded_controls and up
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
         st.dataframe(mapped_df)
-Sync latest version from canvas — all 4 file inputs included
