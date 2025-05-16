@@ -108,6 +108,7 @@ if upload_trigger and uploaded_zip and uploaded_csv and uploaded_controls and up
             "ID", "Title", "Framework Requirement", "Test name", "Test ID", "URL"
         ]
         output_df = mapped_df[output_columns].copy()
+        output_df.drop_duplicates(inplace=True)
 
         # Insert Vanta evidence CSV
         if "all-evidence-vanta" in wb.sheetnames:
