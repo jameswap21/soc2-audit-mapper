@@ -5,10 +5,35 @@ import pandas as pd
 from pathlib import Path
 from openpyxl import load_workbook
 import tempfile
+from vanta_auditor_client import VantaAuditorClient
 
 st.title("SOC 2 Audit Evidence Mapper")
 
-# File upload widgets
+st.header("🔐 Connect to Vanta Auditor API")
+with st.expander("Step 1: Authenticate"):
+    client_id = st.text_input("Client ID", type="password")
+    client_secret = st.text_input("Client Secret", type="password")
+    org_slug = st.text_input("Org Slug (e.g., advantage-partners.com)")
+    audit_id = st.text_input("Audit ID (from Vanta UI)")
+
+    if st.button("Fetch Evidence from Vanta"):
+        if not all([client_id, client_secret, org_slug, audit_id]):
+            st.error("Please fill in all fields.")
+        else:
+            try:
+                client = VantaAuditorClient(client_id, client_secret)
+                test_data = client.list_tests(org_slug, audit_id)
+                evidence_data = client.list_evidence(org_slug, audit_id)
+
+                st.success("Data fetched from Vanta!")
+                st.subheader("Tests")
+                st.json(test_data)
+                st.subheader("Evidence")
+                st.json(evidence_data)
+            except Exception as e:
+                st.error(f"Error: {e}")
+
+st.header("📁 Manual Uploads (ZIP + CSV)")
 uploaded_zip = st.file_uploader("Upload Evidence ZIP File", type="zip")
 uploaded_csv = st.file_uploader("Upload soc2-evidence CSV File", type="csv")
 uploaded_controls = st.file_uploader("Upload SOC 2 Controls Mapping CSV File", type="csv")
@@ -24,7 +49,6 @@ if upload_trigger and uploaded_zip and uploaded_csv and uploaded_controls and up
         evidence_folder.mkdir(parents=True, exist_ok=True)
         extract_dir.mkdir(parents=True, exist_ok=True)
 
-        # Save uploaded files
         zip_path = evidence_folder / uploaded_zip.name
         with open(zip_path, "wb") as f:
             f.write(uploaded_zip.read())
@@ -39,7 +63,6 @@ if upload_trigger and uploaded_zip and uploaded_csv and uploaded_controls and up
             f.write(uploaded_controls.read())
         controls_df = pd.read_csv(str(controls_path))
 
-        # Normalize and rename important columns in controls
         controls_df.columns = controls_df.columns.str.strip()
         controls_df = controls_df.rename(columns={
             "Framework requirement": "Framework Requirement",
@@ -51,11 +74,9 @@ if upload_trigger and uploaded_zip and uploaded_csv and uploaded_controls and up
             f.write(uploaded_workbook.read())
         wb = load_workbook(wb_path)
 
-        # Extract ZIP
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(extract_dir)
 
-        # Index evidence files
         evidence_index = []
         for root_dir, dirs, files in os.walk(extract_dir):
             for filename in files:
@@ -69,7 +90,6 @@ if upload_trigger and uploaded_zip and uploaded_csv and uploaded_controls and up
                 })
         index_df = pd.DataFrame(evidence_index)
 
-        # Clean and join controls (many-to-many allowed)
         controls_df = controls_df.dropna(subset=["ID", "Test name"])
         controls_df["ID"] = controls_df["ID"].astype(str).str.strip()
         controls_df["Test name"] = controls_df["Test name"].astype(str).str.strip()
@@ -82,7 +102,6 @@ if upload_trigger and uploaded_zip and uploaded_csv and uploaded_controls and up
             right_on="Title"
         )
 
-        # Load Tests sheet and join for Test ID (Reference ID)
         if "Tests" in wb.sheetnames:
             tests_ws = wb["Tests"]
             tests_data = list(tests_ws.values)
@@ -102,7 +121,6 @@ if upload_trigger and uploaded_zip and uploaded_csv and uploaded_controls and up
                 on="Test name"
             )
 
-        # Reorder and select relevant columns for output
         output_columns = [
             "Filename", "Relative Path", "Vanta Control ID",
             "ID", "Title", "Framework Requirement", "Test name", "Test ID", "URL"
@@ -110,7 +128,6 @@ if upload_trigger and uploaded_zip and uploaded_csv and uploaded_controls and up
         output_df = mapped_df[output_columns].copy()
         output_df.drop_duplicates(inplace=True)
 
-        # Insert Vanta evidence CSV
         if "all-evidence-vanta" in wb.sheetnames:
             del wb["all-evidence-vanta"]
         all_ev_ws = wb.create_sheet("all-evidence-vanta")
@@ -118,7 +135,6 @@ if upload_trigger and uploaded_zip and uploaded_csv and uploaded_controls and up
         for row in vanta_df.itertuples(index=False):
             all_ev_ws.append(list(row))
 
-        # Insert mapping into evidence-index
         if "evidence-index" in wb.sheetnames:
             del wb["evidence-index"]
         ev_map_ws = wb.create_sheet("evidence-index")
@@ -126,7 +142,6 @@ if upload_trigger and uploaded_zip and uploaded_csv and uploaded_controls and up
         for row in output_df.itertuples(index=False):
             ev_map_ws.append(list(row))
 
-        # Save and offer for download
         updated_path = tmp_path / f"updated_{uploaded_workbook.name}"
         wb.save(updated_path)
         st.success("Workbook successfully updated!")
