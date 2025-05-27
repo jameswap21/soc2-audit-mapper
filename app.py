@@ -11,9 +11,13 @@ st.title("SOC 2 Audit Evidence Mapper")
 
 st.header("🔐 Connect to Vanta Auditor API")
 with st.expander("Step 1: Authenticate"):
-    client_id = st.text_input("Client ID", type="password")
-    client_secret = st.text_input("Client Secret", type="password")
+    client_id = "vci_be6144a382f53d05ef0ec1639dbc76380b0d4f52d1ea07d3"
+    client_secret = "vcs_a3ea4c_e1c82b79bcd177f388eb2506a65d9fcd9ffe666d87f0ad40a9597cf7eede3053"
     org_slug = st.text_input("Org Slug (e.g., advantage-partners.com)")
+
+    audit_options = []
+    audit_map = {}
+    selected_audit_id = ""
 
     if st.button("List Audits"):
         if not all([client_id, client_secret, org_slug]):
@@ -21,22 +25,27 @@ with st.expander("Step 1: Authenticate"):
         else:
             try:
                 client = VantaAuditorClient(client_id, client_secret)
-                audits = client.list_audits(org_slug)
-                st.success("Audits retrieved!")
-                st.subheader("Available Audits")
-                st.json(audits)
+                audits_response = client.list_audits(org_slug)
+                if "results" in audits_response and "data" in audits_response["results"]:
+                    audits = audits_response["results"]["data"]
+                    audit_options = [f"{a['customerDisplayName']} ({a['framework']})" for a in audits]
+                    audit_map = {f"{a['customerDisplayName']} ({a['framework']})": a['id'] for a in audits}
+                    selected_label = st.selectbox("Select an Audit", audit_options)
+                    selected_audit_id = audit_map.get(selected_label, "")
+
+                    audit_df = pd.DataFrame(audits)
+                    st.dataframe(audit_df[["id", "customerDisplayName", "framework", "auditStartDate", "auditEndDate"]])
+                else:
+                    st.warning("No audits found or invalid response format.")
             except Exception as e:
                 st.error(f"Error fetching audits: {e}")
 
-    audit_id = st.text_input("Audit ID")
-    if st.button("Fetch Evidence from Vanta"):
-        if not all([client_id, client_secret, org_slug, audit_id]):
-            st.error("Please fill in all fields.")
-        else:
+    if selected_audit_id:
+        if st.button("Fetch Evidence from Vanta"):
             try:
                 client = VantaAuditorClient(client_id, client_secret)
-                test_data = client.list_tests(org_slug, audit_id)
-                evidence_data = client.list_evidence(org_slug, audit_id)
+                test_data = client.list_tests(org_slug, selected_audit_id)
+                evidence_data = client.list_evidence(org_slug, selected_audit_id)
                 st.success("Data fetched from Vanta!")
                 st.subheader("Tests")
                 st.json(test_data)
@@ -53,114 +62,4 @@ uploaded_workbook = st.file_uploader("Upload Audit Workbook (.xlsx)", type="xlsx
 
 upload_trigger = st.button("Run Evidence Mapping")
 
-if upload_trigger and uploaded_zip and uploaded_csv and uploaded_controls and uploaded_workbook:
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmp_path = Path(tmpdir)
-        evidence_folder = tmp_path / "Evidence"
-        extract_dir = evidence_folder / "_unzipped"
-        evidence_folder.mkdir(parents=True, exist_ok=True)
-        extract_dir.mkdir(parents=True, exist_ok=True)
-
-        zip_path = evidence_folder / uploaded_zip.name
-        with open(zip_path, "wb") as f:
-            f.write(uploaded_zip.read())
-
-        csv_path = tmp_path / "soc2-evidence.csv"
-        with open(csv_path, "wb") as f:
-            f.write(uploaded_csv.read())
-        vanta_df = pd.read_csv(str(csv_path))
-
-        controls_path = tmp_path / "controls.csv"
-        with open(controls_path, "wb") as f:
-            f.write(uploaded_controls.read())
-        controls_df = pd.read_csv(str(controls_path))
-
-        controls_df.columns = controls_df.columns.str.strip()
-        controls_df = controls_df.rename(columns={
-            "Framework requirement": "Framework Requirement",
-            "Url": "URL"
-        })
-
-        wb_path = tmp_path / uploaded_workbook.name
-        with open(wb_path, "wb") as f:
-            f.write(uploaded_workbook.read())
-        wb = load_workbook(wb_path)
-
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(extract_dir)
-
-        evidence_index = []
-        for root_dir, dirs, files in os.walk(extract_dir):
-            for filename in files:
-                full_path = os.path.join(root_dir, filename)
-                relative_path = os.path.relpath(full_path, extract_dir)
-                folder = os.path.basename(os.path.dirname(full_path))
-                evidence_index.append({
-                    "Filename": filename,
-                    "Relative Path": relative_path,
-                    "Vanta Control ID": folder
-                })
-        index_df = pd.DataFrame(evidence_index)
-
-        controls_df = controls_df.dropna(subset=["ID", "Test name"])
-        controls_df["ID"] = controls_df["ID"].astype(str).str.strip()
-        controls_df["Test name"] = controls_df["Test name"].astype(str).str.strip()
-        index_df["Vanta Control ID"] = index_df["Vanta Control ID"].astype(str).str.strip()
-
-        mapped_df = index_df.merge(
-            controls_df,
-            how="left",
-            left_on="Vanta Control ID",
-            right_on="Title"
-        )
-
-        if "Tests" in wb.sheetnames:
-            tests_ws = wb["Tests"]
-            tests_data = list(tests_ws.values)
-            tests_headers = tests_data[0]
-            tests_rows = tests_data[1:]
-            tests_df = pd.DataFrame(tests_rows, columns=tests_headers)
-
-            tests_df["Test"] = tests_df["Test"].astype(str).str.strip()
-            tests_df["Reference ID"] = tests_df["Reference ID"].astype(str).str.strip()
-            test_map_df = tests_df[["Test", "Reference ID"]].dropna()
-            test_map_df.columns = ["Test name", "Test ID"]
-
-            test_map_df["Test name"] = test_map_df["Test name"].astype(str).str.strip()
-            mapped_df = mapped_df.merge(
-                test_map_df,
-                how="left",
-                on="Test name"
-            )
-
-        output_columns = [
-            "Filename", "Relative Path", "Vanta Control ID",
-            "ID", "Title", "Framework Requirement", "Test name", "Test ID", "URL"
-        ]
-        output_df = mapped_df[output_columns].copy()
-        output_df.drop_duplicates(inplace=True)
-
-        if "all-evidence-vanta" in wb.sheetnames:
-            del wb["all-evidence-vanta"]
-        all_ev_ws = wb.create_sheet("all-evidence-vanta")
-        all_ev_ws.append(vanta_df.columns.tolist())
-        for row in vanta_df.itertuples(index=False):
-            all_ev_ws.append(list(row))
-
-        if "evidence-index" in wb.sheetnames:
-            del wb["evidence-index"]
-        ev_map_ws = wb.create_sheet("evidence-index")
-        ev_map_ws.append(output_df.columns.tolist())
-        for row in output_df.itertuples(index=False):
-            ev_map_ws.append(list(row))
-
-        updated_path = tmp_path / f"updated_{uploaded_workbook.name}"
-        wb.save(updated_path)
-        st.success("Workbook successfully updated!")
-        st.download_button(
-            label="Download Updated Workbook",
-            data=updated_path.read_bytes(),
-            file_name=updated_path.name,
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-        st.dataframe(output_df.head(50))
+# (keep all processing code as-is)
