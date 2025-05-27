@@ -23,8 +23,8 @@ class VantaAuditorClient:
         response.raise_for_status()
         return response.json()["access_token"]
 
-    def list_audits(self):
-        url = "https://api.vanta.com/auditor/audits"
+    def list_audits(self, org_slug):
+        url = f"https://api.vanta.com/auditor/{org_slug}/audits"
         headers = {
             "Authorization": f"Bearer {self.token}"
         }
@@ -38,11 +38,12 @@ st.header("🔐 Connect to Vanta Auditor API")
 with st.expander("Step 1: Authenticate"):
     client_id = "vci_be6144a382f53d05ef0ec1639dbc76380b0d4f52d1ea07d3"
     client_secret = "vcs_a3ea4c_e1c82b79bcd177f388eb2506a65d9fcd9ffe666d87f0ad40a9597cf7eede3053"
+    org_slug = "advantage-partners.com"
 
     if st.button("List Available Audits"):
         try:
             client = VantaAuditorClient(client_id, client_secret)
-            audits = client.list_audits()
+            audits = client.list_audits(org_slug)
             if audits:
                 audit_df = pd.DataFrame(audits)
                 st.session_state["audit_df"] = audit_df
