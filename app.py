@@ -26,22 +26,27 @@ class VantaAuditorClient:
 
     def graphql_list_audits(self):
         url = "https://api.vanta.com/graphql"
-        headers = {"Authorization": f"Bearer {self.token}"}
+        headers = {
+            "Authorization": f"Bearer {self.token}",
+            "Content-Type": "application/json"
+        }
         query = """
         query ListAudits {
-            audits {
-                id
-                customerDisplayName
-                framework
-                auditStartDate
-                auditEndDate
+            results: listAudits {
+                data {
+                    id
+                    customerDisplayName
+                    framework
+                    auditStartDate
+                    auditEndDate
+                }
             }
         }
         """
         response = requests.post(url, headers=headers, json={"query": query})
         response.raise_for_status()
         data = response.json()
-        return data["data"]["audits"]
+        return data["data"]["results"]["data"]
 
 st.title("SOC 2 Audit Evidence Mapper")
 
