@@ -5,7 +5,6 @@ import pandas as pd
 from pathlib import Path
 from openpyxl import load_workbook
 import tempfile
-from vanta_auditor_client import VantaAuditorClient
 import requests
 
 class VantaAuditorClient:
@@ -24,29 +23,14 @@ class VantaAuditorClient:
         response.raise_for_status()
         return response.json()["access_token"]
 
-    def graphql_list_audits(self):
-        url = "https://api.vanta.com/graphql"
+    def list_audits(self):
+        url = "https://api.vanta.com/auditor/audits"
         headers = {
-            "Authorization": f"Bearer {self.token}",
-            "Content-Type": "application/json"
+            "Authorization": f"Bearer {self.token}"
         }
-        query = """
-        query ListAudits {
-            results: listAudits {
-                data {
-                    id
-                    customerDisplayName
-                    framework
-                    auditStartDate
-                    auditEndDate
-                }
-            }
-        }
-        """
-        response = requests.post(url, headers=headers, json={"query": query})
+        response = requests.get(url, headers=headers)
         response.raise_for_status()
-        data = response.json()
-        return data["data"]["results"]["data"]
+        return response.json()["results"]["data"]
 
 st.title("SOC 2 Audit Evidence Mapper")
 
@@ -58,7 +42,7 @@ with st.expander("Step 1: Authenticate"):
     if st.button("List Available Audits"):
         try:
             client = VantaAuditorClient(client_id, client_secret)
-            audits = client.graphql_list_audits()
+            audits = client.list_audits()
             if audits:
                 audit_df = pd.DataFrame(audits)
                 st.session_state["audit_df"] = audit_df
@@ -81,13 +65,8 @@ with st.expander("Step 1: Authenticate"):
         else:
             try:
                 client = VantaAuditorClient(client_id, client_secret)
-                test_data = client.list_tests_by_audit_id(audit_id)
-                evidence_data = client.list_evidence_by_audit_id(audit_id)
-                st.success("Data fetched from Vanta!")
-                st.subheader("Tests")
-                st.json(test_data)
-                st.subheader("Evidence")
-                st.json(evidence_data)
+                st.success("Successfully authenticated with Vanta API!")
+                # You would place calls to fetch test/evidence here when implemented
             except Exception as e:
                 st.error(f"Error: {e}")
 
