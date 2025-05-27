@@ -32,7 +32,7 @@ class VantaAuditorClient:
         query = {
             "query": """
             query ListAudits {
-              audits(first: 50) {
+              results: audits(first: 50) {
                 data {
                   id
                   customerDisplayName
@@ -46,7 +46,7 @@ class VantaAuditorClient:
         }
         response = requests.post(url, headers=headers, json=query)
         response.raise_for_status()
-        return response.json()["data"]["audits"]["data"]
+        return response.json()["results"]["data"]
 
 st.title("SOC 2 Audit Evidence Mapper")
 
