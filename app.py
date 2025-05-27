@@ -33,6 +33,26 @@ class VantaAuditorClient:
         response.raise_for_status()
         return response.json()["results"]["data"]
 
+    def list_tests(self, audit_id):
+        url = f"https://api.vanta.com/v1/audits/{audit_id}/tests"
+        headers = {
+            "Authorization": f"Bearer {self.token}",
+            "Accept": "application/json"
+        }
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        return response.json()
+
+    def list_evidence(self, audit_id):
+        url = f"https://api.vanta.com/v1/audits/{audit_id}/evidence"
+        headers = {
+            "Authorization": f"Bearer {self.token}",
+            "Accept": "application/json"
+        }
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        return response.json()
+
 st.title("SOC 2 Audit Evidence Mapper")
 
 st.header("🔐 Connect to Vanta Auditor API")
@@ -67,7 +87,17 @@ with st.expander("Step 1: Authenticate"):
             try:
                 client = VantaAuditorClient(client_id, client_secret)
                 st.success("Successfully authenticated with Vanta API!")
-                # You would place calls to fetch test/evidence here when implemented
+
+                # Fetch and display tests
+                tests = client.list_tests(audit_id)
+                st.subheader("📋 Audit Tests")
+                st.json(tests)
+
+                # Fetch and display evidence
+                evidence = client.list_evidence(audit_id)
+                st.subheader("📎 Audit Evidence")
+                st.json(evidence)
+
             except Exception as e:
                 st.error(f"Error: {e}")
 
