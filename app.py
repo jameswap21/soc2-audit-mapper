@@ -23,28 +23,13 @@ class VantaAuditorClient:
         response.raise_for_status()
         return response.json()["access_token"]
 
-    def list_audits_graphql(self):
-        url = "https://api.vanta.com/graphql"
+    def list_audits_rest(self, page_size=100):
+        url = f"https://api.vanta.com/v1/audits?pageSize={page_size}"
         headers = {
             "Authorization": f"Bearer {self.token}",
-            "Content-Type": "application/json"
+            "Accept": "application/json"
         }
-        query = {
-            "query": """
-            query ListAudits {
-              results: audits(first: 50) {
-                data {
-                  id
-                  customerDisplayName
-                  framework
-                  auditStartDate
-                  auditEndDate
-                }
-              }
-            }
-            """
-        }
-        response = requests.post(url, headers=headers, json=query)
+        response = requests.get(url, headers=headers)
         response.raise_for_status()
         return response.json()["results"]["data"]
 
@@ -58,7 +43,7 @@ with st.expander("Step 1: Authenticate"):
     if st.button("List Available Audits"):
         try:
             client = VantaAuditorClient(client_id, client_secret)
-            audits = client.list_audits_graphql()
+            audits = client.list_audits_rest()
             if audits:
                 audit_df = pd.DataFrame(audits)
                 st.session_state["audit_df"] = audit_df
