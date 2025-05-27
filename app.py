@@ -14,28 +14,14 @@ with st.expander("Step 1: Authenticate"):
     client_id = st.text_input("Client ID", type="password")
     client_secret = st.text_input("Client Secret", type="password")
     org_slug = st.text_input("Org Slug (e.g., advantage-partners.com)")
+    audit_id = st.text_input("Audit ID")
 
-    audit_id = None
-    audit_list = []
-    if st.button("Fetch Available Audits"):
-        if not all([client_id, client_secret, org_slug]):
+    if st.button("Fetch Evidence from Vanta"):
+        if not all([client_id, client_secret, org_slug, audit_id]):
             st.error("Please fill in all fields.")
         else:
             try:
                 client = VantaAuditorClient(client_id, client_secret)
-                audits = client.list_audits(org_slug)
-                audit_list = audits.get("audits", [])
-                if audit_list:
-                    audit_id = st.selectbox("Select an Audit", options=[a['id'] for a in audit_list])
-                    st.success("Audits retrieved successfully!")
-                else:
-                    st.warning("No audits found for this org slug.")
-            except Exception as e:
-                st.error(f"Error: {e}")
-
-    if audit_id:
-        if st.button("Fetch Evidence from Vanta"):
-            try:
                 test_data = client.list_tests(org_slug, audit_id)
                 evidence_data = client.list_evidence(org_slug, audit_id)
                 st.success("Data fetched from Vanta!")
