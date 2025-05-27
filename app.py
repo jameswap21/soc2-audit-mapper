@@ -6,6 +6,42 @@ from pathlib import Path
 from openpyxl import load_workbook
 import tempfile
 from vanta_auditor_client import VantaAuditorClient
+import requests
+
+class VantaAuditorClient:
+    def __init__(self, client_id, client_secret):
+        self.token = self._authenticate(client_id, client_secret)
+
+    def _authenticate(self, client_id, client_secret):
+        url = "https://api.vanta.com/oauth/token"
+        payload = {
+            "grant_type": "client_credentials",
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "scope": "auditor-api.audit:read"
+        }
+        response = requests.post(url, json=payload)
+        response.raise_for_status()
+        return response.json()["access_token"]
+
+    def graphql_list_audits(self):
+        url = "https://api.vanta.com/graphql"
+        headers = {"Authorization": f"Bearer {self.token}"}
+        query = """
+        query ListAudits {
+            audits {
+                id
+                customerDisplayName
+                framework
+                auditStartDate
+                auditEndDate
+            }
+        }
+        """
+        response = requests.post(url, headers=headers, json={"query": query})
+        response.raise_for_status()
+        data = response.json()
+        return data["data"]["audits"]
 
 st.title("SOC 2 Audit Evidence Mapper")
 
