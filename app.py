@@ -59,7 +59,15 @@ class VantaAuditorClient:
 
     def download_evidence_files(self, audit_id):
         evidence = self.list_evidence(audit_id)
-        file_links = [(e.get('id'), e.get('fileDownloadLink')) for e in evidence if e.get('fileDownloadLink') is not None]
+        file_links = []
+        for e in evidence:
+            evidence_id = e.get('id')
+            if 'fileDownloadLink' in e and e['fileDownloadLink']:
+                file_links.append((evidence_id, e['fileDownloadLink']))
+            elif 'fileDownloadLink' in e and isinstance(e['fileDownloadLink'], dict):
+                link = e['fileDownloadLink'].get('url')
+                if link:
+                    file_links.append((evidence_id, link))
         return file_links
 
 st.title("SOC 2 Audit Evidence Mapper")
