@@ -33,8 +33,8 @@ class VantaAuditorClient:
         response.raise_for_status()
         return response.json()["results"]["data"]
 
-    def list_tests(self, audit_id):
-        url = f"https://api.vanta.com/v1/audits/{audit_id}/tests"
+    def list_tests(self):
+        url = "https://api.vanta.com/v1/tests?pageSize=100"
         headers = {
             "Authorization": f"Bearer {self.token}",
             "Accept": "application/json"
@@ -89,8 +89,8 @@ with st.expander("Step 1: Authenticate"):
                 st.success("Successfully authenticated with Vanta API!")
 
                 # Fetch and display tests
-                tests = client.list_tests(audit_id)
-                st.subheader("📋 Audit Tests")
+                tests = client.list_tests()
+                st.subheader("📋 All Audit Tests")
                 st.json(tests)
 
                 # Fetch and display evidence
