@@ -34,14 +34,28 @@ class VantaAuditorClient:
         return response.json()["results"]["data"]
 
     def list_evidence(self, audit_id):
-        url = f"https://api.vanta.com/v1/audits/{audit_id}/evidence"
+        all_evidence = []
+        base_url = f"https://api.vanta.com/v1/audits/{audit_id}/evidence"
         headers = {
             "Authorization": f"Bearer {self.token}",
             "Accept": "application/json"
         }
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
-        return response.json()
+        next_url = base_url
+
+        while next_url:
+            response = requests.get(next_url, headers=headers)
+            response.raise_for_status()
+            data = response.json()
+            all_evidence.extend(data.get("results", {}).get("data", []))
+
+            page_info = data.get("results", {}).get("pageInfo", {})
+            if page_info.get("hasNextPage"):
+                cursor = page_info.get("endCursor")
+                next_url = f"{base_url}?pageCursor={cursor}"
+            else:
+                next_url = None
+
+        return all_evidence
 
 st.title("SOC 2 Audit Evidence Mapper")
 
@@ -78,9 +92,9 @@ with st.expander("Step 1: Authenticate"):
                 client = VantaAuditorClient(client_id, client_secret)
                 st.success("Successfully authenticated with Vanta API!")
 
-                # Fetch and display evidence
+                # Fetch and display all evidence
                 evidence = client.list_evidence(audit_id)
-                evidence_df = pd.json_normalize(evidence.get("results", {}).get("data", []))
+                evidence_df = pd.json_normalize(evidence)
                 st.subheader("📎 Audit Evidence")
                 st.dataframe(evidence_df)
 
