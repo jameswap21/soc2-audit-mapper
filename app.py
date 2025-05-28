@@ -64,12 +64,11 @@ class VantaAuditorClient:
 
         for e in evidence:
             evidence_id = e.get('id')
-            download_url = None
+            file_info = e.get('fileDownloadLink')
 
-            if isinstance(e.get('fileDownloadLink'), dict):
-                download_url = e['fileDownloadLink'].get('url')
-            elif isinstance(e.get('fileDownloadLink'), str):
-                download_url = e.get('fileDownloadLink')
+            download_url = None
+            if isinstance(file_info, dict):
+                download_url = file_info.get('url')
 
             if download_url:
                 try:
@@ -122,7 +121,7 @@ with st.expander("Step 1: Authenticate"):
                 # Fetch and display all evidence
                 evidence = client.list_evidence(audit_id)
                 evidence_df = pd.json_normalize(evidence)
-                evidence_df["HasDownloadLink"] = evidence_df["fileDownloadLink"].notnull() if "fileDownloadLink" in evidence_df.columns else False
+                evidence_df["HasDownloadLink"] = evidence_df["fileDownloadLink"].apply(lambda x: isinstance(x, dict) and x.get("url") is not None if x is not None else False)
                 st.subheader("\U0001f4ce Audit Evidence")
                 st.dataframe(evidence_df)
 
@@ -139,9 +138,18 @@ with st.expander("Step 1: Authenticate"):
                 st.subheader("\U0001f4c4 Downloadable Evidence Files")
                 evidence_files = client.download_evidence_files(audit_id)
                 if evidence_files:
-                    st.success(f"Successfully downloaded {len(evidence_files)} evidence files.")
-                    for file_path in evidence_files:
-                        st.write(f"Downloaded: {file_path}")
+                    zip_path = f"{selected_audit.replace(' ', '_')}_evidence_files.zip"
+                    with zipfile.ZipFile(zip_path, 'w') as zipf:
+                        for file_path in evidence_files:
+                            zipf.write(file_path, os.path.basename(file_path))
+
+                    with open(zip_path, "rb") as f:
+                        st.download_button(
+                            label="\U0001f4e5 Download All Evidence Files as ZIP",
+                            data=f,
+                            file_name=zip_path,
+                            mime="application/zip"
+                        )
                 else:
                     st.warning("No downloadable evidence files found.")
 
