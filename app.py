@@ -88,11 +88,6 @@ with st.expander("Step 1: Authenticate"):
                 client = VantaAuditorClient(client_id, client_secret)
                 st.success("Successfully authenticated with Vanta API!")
 
-                # Fetch and display tests
-                tests = client.list_tests()
-                st.subheader("📋 All Audit Tests")
-                st.json(tests)
-
                 # Fetch and display evidence
                 evidence = client.list_evidence(audit_id)
                 st.subheader("📎 Audit Evidence")
