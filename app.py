@@ -33,16 +33,6 @@ class VantaAuditorClient:
         response.raise_for_status()
         return response.json()["results"]["data"]
 
-    def list_tests(self):
-        url = "https://api.vanta.com/v1/tests?pageSize=100"
-        headers = {
-            "Authorization": f"Bearer {self.token}",
-            "Accept": "application/json"
-        }
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
-        return response.json()
-
     def list_evidence(self, audit_id):
         url = f"https://api.vanta.com/v1/audits/{audit_id}/evidence"
         headers = {
@@ -90,8 +80,18 @@ with st.expander("Step 1: Authenticate"):
 
                 # Fetch and display evidence
                 evidence = client.list_evidence(audit_id)
+                evidence_df = pd.json_normalize(evidence.get("results", {}).get("data", []))
                 st.subheader("📎 Audit Evidence")
-                st.json(evidence)
+                st.dataframe(evidence_df)
+
+                # Offer export option
+                csv = evidence_df.to_csv(index=False).encode("utf-8")
+                st.download_button(
+                    label="📥 Download Evidence as CSV",
+                    data=csv,
+                    file_name=f"{selected_audit.replace(' ', '_')}_evidence.csv",
+                    mime="text/csv"
+                )
 
             except Exception as e:
                 st.error(f"Error: {e}")
