@@ -98,7 +98,7 @@ with st.expander("Step 1: Authenticate"):
                 st.subheader("📎 Audit Evidence")
                 st.dataframe(evidence_df)
 
-                # Offer export option
+                # Export all evidence to CSV
                 csv = evidence_df.to_csv(index=False).encode("utf-8")
                 st.download_button(
                     label="📥 Download Evidence as CSV",
