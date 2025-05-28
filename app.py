@@ -57,18 +57,32 @@ class VantaAuditorClient:
 
         return all_evidence
 
-    def download_evidence_files(self, audit_id):
+    def download_evidence_files(self, audit_id, output_dir="evidence_downloads"):
         evidence = self.list_evidence(audit_id)
-        file_links = []
+        os.makedirs(output_dir, exist_ok=True)
+        downloaded_files = []
+
         for e in evidence:
             evidence_id = e.get('id')
-            if 'fileDownloadLink' in e and e['fileDownloadLink']:
-                file_links.append((evidence_id, e['fileDownloadLink']))
-            elif 'fileDownloadLink' in e and isinstance(e['fileDownloadLink'], dict):
-                link = e['fileDownloadLink'].get('url')
-                if link:
-                    file_links.append((evidence_id, link))
-        return file_links
+            download_url = None
+
+            if isinstance(e.get('fileDownloadLink'), dict):
+                download_url = e['fileDownloadLink'].get('url')
+            elif isinstance(e.get('fileDownloadLink'), str):
+                download_url = e.get('fileDownloadLink')
+
+            if download_url:
+                try:
+                    response = requests.get(download_url)
+                    response.raise_for_status()
+                    file_path = os.path.join(output_dir, f"{evidence_id}.bin")
+                    with open(file_path, 'wb') as f:
+                        f.write(response.content)
+                    downloaded_files.append(file_path)
+                except Exception as ex:
+                    print(f"Failed to download {evidence_id}: {ex}")
+
+        return downloaded_files
 
 st.title("SOC 2 Audit Evidence Mapper")
 
@@ -125,15 +139,9 @@ with st.expander("Step 1: Authenticate"):
                 st.subheader("\U0001f4c4 Downloadable Evidence Files")
                 evidence_files = client.download_evidence_files(audit_id)
                 if evidence_files:
-                    file_links_df = pd.DataFrame(evidence_files, columns=["Evidence ID", "Download Link"])
-                    st.dataframe(file_links_df)
-                    download_csv = file_links_df.to_csv(index=False).encode("utf-8")
-                    st.download_button(
-                        label="\U0001f4c1 Download File Links as CSV",
-                        data=download_csv,
-                        file_name=f"{selected_audit.replace(' ', '_')}_file_links.csv",
-                        mime="text/csv"
-                    )
+                    st.success(f"Successfully downloaded {len(evidence_files)} evidence files.")
+                    for file_path in evidence_files:
+                        st.write(f"Downloaded: {file_path}")
                 else:
                     st.warning("No downloadable evidence files found.")
 
