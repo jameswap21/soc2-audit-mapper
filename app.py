@@ -59,12 +59,12 @@ class VantaAuditorClient:
 
     def download_evidence_files(self, audit_id):
         evidence = self.list_evidence(audit_id)
-        file_links = [(e['id'], e.get('fileDownloadLink')) for e in evidence if e.get('fileDownloadLink')]
+        file_links = [(e['id'], e.get('fileDownloadLink', None)) for e in evidence]
         return file_links
 
 st.title("SOC 2 Audit Evidence Mapper")
 
-st.header("🔐 Connect to Vanta Auditor API")
+st.header("\U0001f510 Connect to Vanta Auditor API")
 with st.expander("Step 1: Authenticate"):
     client_id = "vci_be6144a382f53d05ef0ec1639dbc76380b0d4f52d1ea07d3"
     client_secret = "vcs_a3ea4c_e1c82b79bcd177f388eb2506a65d9fcd9ffe666d87f0ad40a9597cf7eede3053"
@@ -100,27 +100,28 @@ with st.expander("Step 1: Authenticate"):
                 # Fetch and display all evidence
                 evidence = client.list_evidence(audit_id)
                 evidence_df = pd.json_normalize(evidence)
-                st.subheader("📎 Audit Evidence")
+                evidence_df["HasDownloadLink"] = evidence_df["fileDownloadLink"].notnull()
+                st.subheader("\U0001f4ce Audit Evidence")
                 st.dataframe(evidence_df)
 
                 # Export all evidence to CSV
                 csv = evidence_df.to_csv(index=False).encode("utf-8")
                 st.download_button(
-                    label="📥 Download Evidence as CSV",
+                    label="\U0001f4c5 Download Evidence as CSV",
                     data=csv,
                     file_name=f"{selected_audit.replace(' ', '_')}_evidence.csv",
                     mime="text/csv"
                 )
 
-                # Attempt to fetch and display downloadable evidence file links
-                st.subheader("📄 Downloadable Evidence Files")
+                # Fetch and display downloadable evidence file links
+                st.subheader("\U0001f4c4 Downloadable Evidence Files")
                 evidence_files = client.download_evidence_files(audit_id)
-                if evidence_files:
-                    file_links_df = pd.DataFrame(evidence_files, columns=["Evidence ID", "Download Link"])
+                file_links_df = pd.DataFrame(evidence_files, columns=["Evidence ID", "Download Link"])
+                if not file_links_df[file_links_df["Download Link"].notnull()].empty:
                     st.dataframe(file_links_df)
                     download_csv = file_links_df.to_csv(index=False).encode("utf-8")
                     st.download_button(
-                        label="📁 Download File Links as CSV",
+                        label="\U0001f4c1 Download File Links as CSV",
                         data=download_csv,
                         file_name=f"{selected_audit.replace(' ', '_')}_file_links.csv",
                         mime="text/csv"
@@ -131,7 +132,7 @@ with st.expander("Step 1: Authenticate"):
             except Exception as e:
                 st.error(f"Error: {e}")
 
-st.header("📁 Manual Uploads (ZIP + CSV)")
+st.header("\U0001f4c1 Manual Uploads (ZIP + CSV)")
 uploaded_zip = st.file_uploader("Upload Evidence ZIP File", type="zip")
 uploaded_csv = st.file_uploader("Upload soc2-evidence CSV File", type="csv")
 uploaded_controls = st.file_uploader("Upload SOC 2 Controls Mapping CSV File", type="csv")
