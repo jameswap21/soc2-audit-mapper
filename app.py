@@ -64,21 +64,19 @@ class VantaAuditorClient:
 
         for e in evidence:
             file_info = e.get('fileDownloadLink')
-            download_url = None
-            if file_info and isinstance(file_info, dict):
-                download_url = file_info.get('url')
-
-            if download_url:
-                try:
-                    response = requests.get(download_url)
-                    response.raise_for_status()
-                    filename = file_info.get("filename", f"{e.get('id')}.bin")
-                    file_path = os.path.join(output_dir, filename)
-                    with open(file_path, 'wb') as f:
-                        f.write(response.content)
-                    downloaded_files.append(file_path)
-                except Exception as ex:
-                    print(f"Failed to download {e.get('id')}: {ex}")
+            if file_info is not None and isinstance(file_info, dict):
+                download_url = file_info.get("url")
+                if download_url:
+                    try:
+                        response = requests.get(download_url)
+                        response.raise_for_status()
+                        filename = file_info.get("filename", f"{e.get('id')}.bin")
+                        file_path = os.path.join(output_dir, filename)
+                        with open(file_path, 'wb') as f:
+                            f.write(response.content)
+                        downloaded_files.append(file_path)
+                    except Exception as ex:
+                        print(f"Failed to download {e.get('id')}: {ex}")
 
         return downloaded_files
 
