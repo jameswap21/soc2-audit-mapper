@@ -59,9 +59,7 @@ class VantaAuditorClient:
 
     def download_evidence_files(self, audit_id):
         evidence = self.list_evidence(audit_id)
-        file_links = [(e['id'], e.get('fileDownloadLink', 'N/A')) for e in evidence if e.get('fileDownloadLink')]
-        if not file_links:
-            return [(e['id'], 'N/A') for e in evidence]
+        file_links = [(e['id'], e['fileDownloadLink']) for e in evidence if e.get('fileDownloadLink') is not None]
         return file_links
 
 st.title("SOC 2 Audit Evidence Mapper")
@@ -102,7 +100,7 @@ with st.expander("Step 1: Authenticate"):
                 # Fetch and display all evidence
                 evidence = client.list_evidence(audit_id)
                 evidence_df = pd.json_normalize(evidence)
-                evidence_df["HasDownloadLink"] = evidence_df.get("fileDownloadLink").notnull()
+                evidence_df["HasDownloadLink"] = evidence_df["fileDownloadLink"].notnull()
                 st.subheader("\U0001f4ce Audit Evidence")
                 st.dataframe(evidence_df)
 
