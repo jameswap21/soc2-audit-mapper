@@ -59,7 +59,7 @@ class VantaAuditorClient:
 
     def download_evidence_files(self, audit_id):
         evidence = self.list_evidence(audit_id)
-        file_links = [(e['id'], e.get('fileDownloadLink', None)) for e in evidence]
+        file_links = [(e['id'], e.get('fileDownloadLink', 'N/A')) for e in evidence]
         return file_links
 
 st.title("SOC 2 Audit Evidence Mapper")
@@ -117,17 +117,14 @@ with st.expander("Step 1: Authenticate"):
                 st.subheader("\U0001f4c4 Downloadable Evidence Files")
                 evidence_files = client.download_evidence_files(audit_id)
                 file_links_df = pd.DataFrame(evidence_files, columns=["Evidence ID", "Download Link"])
-                if not file_links_df[file_links_df["Download Link"].notnull()].empty:
-                    st.dataframe(file_links_df)
-                    download_csv = file_links_df.to_csv(index=False).encode("utf-8")
-                    st.download_button(
-                        label="\U0001f4c1 Download File Links as CSV",
-                        data=download_csv,
-                        file_name=f"{selected_audit.replace(' ', '_')}_file_links.csv",
-                        mime="text/csv"
-                    )
-                else:
-                    st.info("No downloadable evidence files found.")
+                st.dataframe(file_links_df)
+                download_csv = file_links_df.to_csv(index=False).encode("utf-8")
+                st.download_button(
+                    label="\U0001f4c1 Download File Links as CSV",
+                    data=download_csv,
+                    file_name=f"{selected_audit.replace(' ', '_')}_file_links.csv",
+                    mime="text/csv"
+                )
 
             except Exception as e:
                 st.error(f"Error: {e}")
