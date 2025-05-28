@@ -104,7 +104,7 @@ with st.expander("Step 1: Authenticate"):
                 st.subheader("\U0001f4ce Audit Evidence")
                 st.dataframe(evidence_df)
 
-                # Export all evidence to CSV
+                # Export all evidence to CSV (including evidenceType)
                 csv = evidence_df.to_csv(index=False).encode("utf-8")
                 st.download_button(
                     label="\U0001f4c5 Download Evidence as CSV",
