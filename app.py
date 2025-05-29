@@ -6,6 +6,7 @@ from pathlib import Path
 from openpyxl import load_workbook
 import tempfile
 import requests
+import re
 
 class VantaAuditorClient:
     def __init__(self, client_id, client_secret):
@@ -159,3 +160,29 @@ uploaded_controls = st.file_uploader("Upload SOC 2 Controls Mapping CSV File", t
 uploaded_workbook = st.file_uploader("Upload Audit Workbook (.xlsx)", type="xlsx")
 
 upload_trigger = st.button("Run Evidence Mapping")
+
+if upload_trigger and uploaded_zip and uploaded_csv:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        zip_path = os.path.join(tmpdir, "evidence.zip")
+        with open(zip_path, "wb") as f:
+            f.write(uploaded_zip.read())
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(tmpdir)
+
+        filenames = os.listdir(tmpdir)
+        extracted_ids = [re.search(r"evidence-(.+?)-\\d{4}-\\d{2}-\\d{2}", name) for name in filenames if name.startswith("evidence-")]
+        matched_ids = [m.group(1) for m in extracted_ids if m]
+
+        csv_df = pd.read_csv(uploaded_csv)
+        csv_df["MatchedToZip"] = csv_df["evidenceId"].apply(lambda x: x in matched_ids)
+
+        st.success("Mapping complete! View below:")
+        st.dataframe(csv_df)
+
+        combined_csv = csv_df.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            label="\U0001f4c5 Download Mapped Evidence CSV",
+            data=combined_csv,
+            file_name="mapped_evidence_results.csv",
+            mime="text/csv"
+        )
