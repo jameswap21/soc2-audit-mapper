@@ -64,7 +64,7 @@ class VantaAuditorClient:
 
         for e in evidence:
             file_info = e.get('fileDownloadLink')
-            if file_info is not None and isinstance(file_info, dict):
+            if isinstance(file_info, dict):
                 download_url = file_info.get("url")
                 if download_url:
                     try:
