@@ -84,8 +84,8 @@ st.title("SOC 2 Audit Evidence Mapper")
 
 st.header("\U0001f510 Connect to Vanta Auditor API")
 with st.expander("Step 1: Authenticate"):
-    client_id = "vci_be6144a382f53d05ef0ec1639dbc76380b0d4f52d1ea07d3"
-    client_secret = "vcs_a3ea4c_e1c82b79bcd177f388eb2506a65d9fcd9ffe666d87f0ad40a9597cf7eede3053"
+    client_id = "vci_
+    client_secret = "vcs_"
 
     if st.button("List Available Audits"):
         try:
